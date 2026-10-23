@@ -42,6 +42,32 @@ app.setAppPath(asarPath);
 if (!IS_VANILLA) {
     const settings = RendererSettings.store;
 
+    // Keep Discord responsive while minimized, in the tray, or behind a game.
+    // Apply before loading Discord's main process and creating its windows.
+    // This workaround can increase background CPU/GPU and power usage.
+    app.commandLine.appendSwitch("disable-renderer-backgrounding");
+    app.commandLine.appendSwitch("disable-background-timer-throttling");
+    app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+
+    if (process.platform === "win32") {
+        const originalAppendSwitch = app.commandLine.appendSwitch;
+        app.commandLine.appendSwitch = function (name: string, value?: string) {
+            if (name === "disable-features") {
+                const disabledFeatures = new Set([
+                    ...this.getSwitchValue("disable-features").split(","),
+                    ...(value ?? "").split(","),
+                    "UseEcoQoSForBackgroundProcess"
+                ].map(feature => feature.trim()).filter(Boolean));
+                return originalAppendSwitch.call(this, name, [...disabledFeatures].join(","));
+            }
+            return value === undefined
+                ? originalAppendSwitch.call(this, name)
+                : originalAppendSwitch.call(this, name, value);
+        };
+        // Apply immediately and preserve the override if Discord appends flags later.
+        app.commandLine.appendSwitch("disable-features");
+    }
+
     patchTrayMenu();
 
     /*
@@ -93,6 +119,8 @@ if (!IS_VANILLA) {
             const isMainWindow = options.title === "Discord";
             options.webPreferences.preload = join(__dirname, "preload.js");
             options.webPreferences.sandbox = false;
+            // Startup flags alone do not disable Electron's window-level throttling.
+            options.webPreferences.backgroundThrottling = false;
 
             if (mainWindowFrameless && isMainWindow) {
                 options.frame = false;
