@@ -139,7 +139,6 @@ export function formatDurationMs(ms: number, human: boolean = false, seconds: bo
     const unit = (s: string) => human ? s : "";
     const delim = human ? " " : ":";
 
-    // thx copilot
     const d = Math.floor(ms / 86400000);
     const h = Math.floor((ms % 86400000) / 3600000);
     const m = Math.floor(((ms % 86400000) % 3600000) / 60000);
